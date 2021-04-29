@@ -1,3 +1,4 @@
 db_files/*
+!db_files/casino.csv
 .idea/*
 __pycache__/*
