@@ -309,6 +309,49 @@ class TooLongException(RuntimeError):
     def __init__(self, msg):
         super().__init__(msg)
 
+def geify(msg):
+    if msg.content.startswith('!ge'):
+        split_msg = msg.content[4:].split()
+        out = []
+        for s in split_msg:
+            out_msg = ''
+            if ')' in s:
+                t = s.split(')')
+                if t[0][-1].isupper():
+                    t[0] += 'GE'
+                else:
+                    t[0] += 'ge'
+                out_msg = ')'.join(t)
+            elif ',' in s:
+                t = s.split(',')
+                if t[0][-1].isupper():
+                    t[0] += 'GE'
+                else:
+                    t[0] += 'ge'
+                out_msg = ','.join(t)
+            elif '.' in s:
+                t = s.split('.')
+                if t[0][-1].isupper():
+                    t[0] += 'GE'
+                else:
+                    t[0] += 'ge'
+                out_msg = '.'.join(t)
+            else:
+                if s[-1].isupper():
+                    out_msg = s + 'GE'
+                else:
+                    out_msg = s + 'ge'
+            out.append(out_msg)
+
+        # out = [s + 'ge' for s in split_msg]
+        return ' '.join(out)
+    return None
+
+def floosh(msg):
+    if msg.content.startswith('!penis'):
+        return '<:flooshed:785647715425976332> <:flooshed:785647715425976332> <:flooshed:785647715425976332>'
+    return None
+
 def get_fantasy_points():
     # SHL reg season
     api_link = 'https://index.simulationhockey.com/api/v1/players/stats'
