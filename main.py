@@ -56,6 +56,15 @@ async def on_message(message):
         if not casino_msg is None:
             await message.channel.send(str(casino_msg))
 
+        ge_msg = geify(message)
+        ge_msg = check_message(ge_msg)
+        if not ge_msg is None:
+            await message.channel.send(ge_msg)
+
+        floosh_msg = floosh(message)
+        if not floosh_msg is None:
+            await message.channel.send(floosh_msg)
+
     except (discord.errors.HTTPException, TooLongException) as e:
         print('this broke', message.content)
         print(e)
