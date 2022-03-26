@@ -65,6 +65,10 @@ async def on_message(message):
         if not floosh_msg is None:
             await message.channel.send(floosh_msg)
 
+        roster_msg = check_roster(message)
+        if not roster_msg is None:
+            await message.channel.send(roster_msg)
+
     except (discord.errors.HTTPException, TooLongException) as e:
         print('this broke', message.content)
         print(e)
