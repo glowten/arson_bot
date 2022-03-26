@@ -368,6 +368,180 @@ def get_fantasy_teams():
     with open(os.path.join(db_loc, 'fantasy_link.txt')) as f_l:
         fantasy_link = f_l.read()
 
+def get_applied_tpe(team_name):
+    show_all_shl = False
+    show_all_j = False
+    team_in_shl = False
+    team_in_j = False
+    team_abbrev = ''
+    if team_name is None or team_name.lower() == 'shl':
+        show_all_shl = True
+    elif team_name.lower() == 'j' or team_name.lower() == 'smjhl':
+        show_all_j = True
+    else:
+        team_name = team_name.lower()
+        # find team in teams first to determine league
+        api_link = 'https://index.simulationhockey.com/api/v1/teams'
+        request = urllib.request.Request(api_link, headers=headers)
+        json_out = urllib.request.urlopen(request).read()
+        teams_df = pd.read_json(json_out, orient='records')
+        teams_df = teams_df[(teams_df['name'].str.lower() == team_name) | (teams_df['abbreviation'].str.lower() == team_name) |
+                            (teams_df['location'].str.lower() == team_name)]
+        if len(teams_df) > 0:
+            team_in_shl = True
+            team_abbrev = teams_df['abbreviation'].iloc[0]
+
+        else:
+            api_link += '?league=1'
+            request = urllib.request.Request(api_link, headers=headers)
+            json_out = urllib.request.urlopen(request).read()
+            teams_df = pd.read_json(json_out, orient='records')
+            teams_df = teams_df[(teams_df['name'].str.lower() == team_name) | (teams_df['abbreviation'].str.lower() == team_name) |
+                                (teams_df['location'].str.lower() == team_name)]
+            if len(teams_df) > 0:
+                team_in_j = True
+                team_abbrev = teams_df['abbreviation'].iloc[0]
+
+        if not (team_in_shl or team_in_j):
+            return None
+
+    api_link = 'https://index.simulationhockey.com/api/v1/players/ratings'
+    if team_in_j or show_all_j:
+        api_link += '?league=1'
+
+    request = urllib.request.Request(api_link, headers=headers)
+    json_out = urllib.request.urlopen(request).read()
+    players_df = pd.read_json(json_out, orient='records')
+    players_df = players_df[['team', 'name', 'position', 'appliedTPE']]
+    # aggregate player positions
+    players_df.loc[(players_df['position'] == 'LD') | (players_df['position'] == 'RD'), 'position'] = 'Defenseman'
+    players_df.loc[(players_df['position'] == 'LW') | (players_df['position'] == 'C') |
+                   (players_df['position'] == 'RW'), 'position'] = 'Forward'
+
+    # add goalies
+    api_link = 'https://index.simulationhockey.com/api/v1/goalies/ratings'
+    if team_in_j or show_all_j:
+        api_link += '?league=1'
+    request = urllib.request.Request(api_link, headers=headers)
+    json_out = urllib.request.urlopen(request).read()
+    goalies_df = pd.read_json(json_out, orient='records')
+    goalies_df = goalies_df[['team', 'name', 'position', 'appliedTPE']]
+    goalies_df['position'] = 'Goalie'
+    players_df = pd.concat([players_df, goalies_df])
+
+    if show_all_shl or show_all_j:
+        # total
+        total_team_tpe_df = players_df.groupby(
+            ['team'])['appliedTPE'].mean().reset_index().sort_values('appliedTPE', ascending=False, ignore_index=True)
+        # position wise
+        team_tpe_df = players_df.groupby(
+            ['team', 'position'])['appliedTPE'].mean().reset_index().sort_values('appliedTPE', ascending=False,
+                                                                                 ignore_index=True)
+        team_f_df = team_tpe_df[team_tpe_df['position'] == 'Forward'].reset_index(drop=True)
+        team_d_df = team_tpe_df[team_tpe_df['position'] == 'Defenseman'].reset_index(drop=True)
+        team_g_df = team_tpe_df[team_tpe_df['position'] == 'Goalie'].reset_index(drop=True)
+        # skater tpe
+        team_s_df = players_df[
+            (players_df['position'] == 'Forward') | (players_df['position'] == 'Defenseman')].groupby(
+            ['team'])['appliedTPE'].mean().reset_index().sort_values('appliedTPE', ascending=False, ignore_index=True)
+
+        # index by 1
+        total_team_tpe_df.index += 1
+        team_f_df.index += 1
+        team_d_df.index += 1
+        team_g_df.index += 1
+        team_s_df.index += 1
+
+        out_dict = {
+            'total': total_team_tpe_df,
+            'f': team_f_df,
+            'd': team_d_df,
+            'g': team_g_df,
+            's': team_s_df,
+            'league': 'SHL' if show_all_shl else 'SMJHL',
+        }
+        return out_dict
+
+    else:
+        # filter team
+        players_df = players_df[players_df['team'] == team_abbrev]
+        total_tpe = players_df['appliedTPE'].mean()
+        # position wise
+        position_tpe = players_df.groupby(
+            ['position'])['appliedTPE'].mean().reset_index()
+        team_f = position_tpe[position_tpe['position'] == 'Forward']['appliedTPE']
+        team_d = position_tpe[position_tpe['position'] == 'Defenseman']['appliedTPE']
+        team_g = position_tpe[position_tpe['position'] == 'Goalie']['appliedTPE']
+        team_s = players_df[(players_df['position'] == 'Forward') |
+                            (players_df['position'] == 'Defenseman')]['appliedTPE'].mean()
+
+        individual = players_df.sort_values('appliedTPE', ascending=False, ignore_index=True)
+
+        # index by 1
+        individual.index += 1
+
+        out_dict = {
+            'individual': individual,
+            'total': total_tpe,
+            'f': float(team_f),
+            'd': float(team_d),
+            'g': float(team_g),
+            's': float(team_s),
+            'team': team_abbrev,
+        }
+        return out_dict
+
+
+def check_roster(msg):
+    if msg.content.lower().startswith('!roster'):
+        rest = msg.content.lower().lstrip('!roster').lstrip()
+        roster_input = None
+        if not len(rest) == 0:
+            roster_input = rest
+        out_dict = get_applied_tpe(roster_input)
+        if out_dict is None:
+            return 'Team ' + rest + ' not found'
+        else:
+            out_str = []
+            # individual team
+            if 'individual' in out_dict.keys():
+                # team name
+                out_str.append(f"{out_dict['team']} TPE Breakdown")
+                # individual
+                out_str.append(f"```{out_dict['individual'].to_string()}```")
+                # f
+                out_str.append(f"Forwards Average TPE: {out_dict['f']:.2f}")
+                # d
+                out_str.append(f"Defensemen Average TPE: {out_dict['d']:.2f}")
+                # g
+                out_str.append(f"Goalies Average TPE: {out_dict['g']:.2f}")
+                # s
+                out_str.append(f"Skaters Average TPE: {out_dict['s']:.2f}")
+                # total
+                out_str.append(f"Total Average TPE: {out_dict['total']:.2f}")
+            else:
+                out_str.append(f"{out_dict['league']} TPE Breakdown")
+                # total
+                out_str.append("Average TPE")
+                out_str.append(f"```{out_dict['total'].to_string()}```")
+                # f
+                out_str.append("Average Forward TPE")
+                out_str.append(f"```{out_dict['f'].to_string()}```")
+                # d
+                out_str.append("Average Defenseman TPE")
+                out_str.append(f"```{out_dict['d'].to_string()}```")
+                # g
+                out_str.append("Average Goalie TPE")
+                out_str.append(f"```{out_dict['g'].to_string()}```")
+                # s
+                out_str.append("Average Skater TPE")
+                out_str.append(f"```{out_dict['s'].to_string()}```")
+
+            return '\n'.join(out_str)
+
+    return None
+
+
 
 def check_message(text):
     if text is not None and len(text) < 2000:
