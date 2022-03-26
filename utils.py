@@ -502,9 +502,9 @@ def check_roster(msg):
         if out_dict is None:
             return 'Team ' + rest + ' not found'
         else:
-            out_str = []
             # individual team
             if 'individual' in out_dict.keys():
+                out_str = []
                 # team name
                 out_str.append(f"{out_dict['team']} TPE Breakdown")
                 # individual
@@ -518,26 +518,23 @@ def check_roster(msg):
                 # s
                 out_str.append(f"Skaters Average TPE: {out_dict['s']:.2f}")
                 # total
-                out_str.append(f"Total Average TPE: {out_dict['total']:.2f}")
-            else:
-                out_str.append(f"{out_dict['league']} TPE Breakdown")
-                # total
-                out_str.append("Average TPE")
-                out_str.append(f"```{out_dict['total'].to_string()}```")
-                # f
-                out_str.append("Average Forward TPE")
-                out_str.append(f"```{out_dict['f'].to_string()}```")
-                # d
-                out_str.append("Average Defenseman TPE")
-                out_str.append(f"```{out_dict['d'].to_string()}```")
-                # g
-                out_str.append("Average Goalie TPE")
-                out_str.append(f"```{out_dict['g'].to_string()}```")
-                # s
-                out_str.append("Average Skater TPE")
-                out_str.append(f"```{out_dict['s'].to_string()}```")
+                out_str.append(f"Average TPE: {out_dict['total']:.2f}")
+                return ['\n'.join(out_str)]
 
-            return '\n'.join(out_str)
+            else:
+                out = []
+                out.append(f"{out_dict['league']} TPE Breakdown")
+                # total
+                out.append(f"Average TPE\n```{out_dict['total'].to_string()}```")
+                # f
+                out.append(f"Average Forward TPE\n```{out_dict['f'].to_string()}```")
+                # d
+                out.append(f"Average Defenseman TPE\n```{out_dict['d'].to_string()}```")
+                # g
+                out.append(f"Average Goalie TPE\n```{out_dict['g'].to_string()}```")
+                # s
+                out.append(f"Average Skater TPE\n```{out_dict['s'].to_string()}```")
+                return out
 
     return None
 
@@ -550,4 +547,3 @@ def check_message(text):
         raise TooLongException('lol message too long')
     return None
 
-# print(get_stats_goalie('Scoochie Stratton'))
