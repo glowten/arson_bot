@@ -2,8 +2,12 @@ import os
 import urllib.request
 import urllib.error
 import json
+from functools import partial
+
 import discord
 import pandas as pd
+import scipy.spatial.distance
+import numpy as np
 pd.options.display.float_format = '{:,.2f}'.format
 
 db_loc = os.path.join(os.getcwd(), 'db_files')
@@ -58,17 +62,46 @@ def process_stats(msg):
         else:
             return None
         try:
-            stats_skater = get_stats_skater(player)
-            if not stats_skater is None:
-                return stats_skater
-            stats_goalie = get_stats_goalie(player)
-            if not stats_goalie is None:
-                return stats_goalie
-            return not_found(f'Player not found: {player}')
+            skater_out = get_player_stats(player)
+            if not isinstance(skater_out, tuple):
+                return skater_out
+            goalie_out = get_player_stats(player, is_goalie=True)
+            if not isinstance(goalie_out, tuple):
+                return goalie_out
+
+            return fuzzy_name_match(player, skater_out, goalie_out)
+            # return not_found(f'Player not found: {player}')
         except urllib.error.HTTPError as err:
             return error_embed(err)
 
     return None
+
+def fuzzy_name_match(player, skater_out, goalie_out):
+    # player not found, do fuzzy string matching
+    player = ''.join(player.lower().split())
+    match_partial = partial(close_match, str_in=player)
+    # shl skater
+    skater_out[0]['distance'] = skater_out[0]['name'].apply(match_partial)
+    shl_skater = skater_out[0].sort_values('distance', ascending=True).iloc[0].squeeze()
+    # j skater
+    skater_out[1]['distance'] = skater_out[1]['name'].apply(match_partial)
+    j_skater = skater_out[1].sort_values('distance', ascending=True).iloc[0].squeeze()
+    # shl goalie
+    goalie_out[0]['distance'] = goalie_out[0]['name'].apply(match_partial)
+    shl_goalie = goalie_out[0].sort_values('distance', ascending=True).iloc[0].squeeze()
+    # j goalie
+    goalie_out[1]['distance'] = goalie_out[1]['name'].apply(match_partial)
+    j_goalie = goalie_out[1].sort_values('distance', ascending=True).iloc[0].squeeze()
+
+    min_match = min(shl_skater['distance'], j_skater['distance'], shl_goalie['distance'], j_goalie['distance'])
+    if shl_skater['distance'] == min_match:
+        return format_skater_stats(shl_skater)
+    if j_skater['distance'] == min_match:
+        return format_skater_stats(j_skater)
+    if shl_goalie['distance'] == min_match:
+        return format_goalie_stats(shl_goalie)
+    if j_goalie['distance'] == min_match:
+        return format_goalie_stats(j_goalie)
 
 def arson(msg):
     if msg.content.lower() == '!arson':
@@ -131,89 +164,63 @@ def error_embed(err):
     embed = discord.Embed(title='Error', description=str(err))
     embed.add_field(name='Oh no what did you do', value='Please try again')
 
-def get_stats_skater(player_name):
+def get_player_stats(player_name, is_goalie=False):
     player_name = player_name.lower()
     # SHL playoffs
     api_link = 'https://index.simulationhockey.com/api/v1/players/stats?type=playoffs'
+    if is_goalie:
+        api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats?type="playoffs"'
     request = urllib.request.Request(api_link, headers=headers)
-    playoff_stats = json.loads(urllib.request.urlopen(request).read())
+    playoff_stats = urllib.request.urlopen(request).read()
+    playoff_stats = pd.read_json(playoff_stats)
 
     # SHL reg season
     api_link = 'https://index.simulationhockey.com/api/v1/players/stats'
+    if is_goalie:
+        api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats'
     request = urllib.request.Request(api_link, headers=headers)
-    reg_stats = json.loads(urllib.request.urlopen(request).read())
+    reg_stats = urllib.request.urlopen(request).read()
+    reg_stats = pd.read_json(reg_stats)
 
-    if playoff_stats[0]['season'] == reg_stats[0]['season']:
-        stats = playoff_stats
+    if playoff_stats.loc[0, 'season'] == reg_stats.loc[0, 'season']:
+        shl_stats = playoff_stats
     else:
-        stats = reg_stats
+        shl_stats = reg_stats
 
-    for i, p in enumerate(stats):
-        if p['name'].lower() == player_name:
-            return format_skater_stats(p)
-
+    match = shl_stats[shl_stats['name'].str.lower() == player_name]
+    if len(match) > 0:
+        if is_goalie:
+            return format_goalie_stats(match.iloc[0].squeeze())
+        return format_skater_stats(match.iloc[0].squeeze())
 
     # SMJHL playoffs
     api_link = 'https://index.simulationhockey.com/api/v1/players/stats?league=1&type=playoffs'
+    if is_goalie:
+        api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats?league=1&type="playoffs"'
     request = urllib.request.Request(api_link, headers=headers)
-    playoff_stats = json.loads(urllib.request.urlopen(request).read())
+    playoff_stats = urllib.request.urlopen(request).read()
+    playoff_stats = pd.read_json(playoff_stats)
 
     # SMJHL reg season
     api_link = 'https://index.simulationhockey.com/api/v1/players/stats?league=1'
+    if is_goalie:
+        api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats?league=1'
     request = urllib.request.Request(api_link, headers=headers)
-    reg_stats = json.loads(urllib.request.urlopen(request).read())
+    reg_stats = urllib.request.urlopen(request).read()
+    reg_stats = pd.read_json(reg_stats)
 
-    if playoff_stats[0]['season'] == reg_stats[0]['season']:
-        stats = playoff_stats
+    if playoff_stats.loc[0, 'season'] == reg_stats.loc[0, 'season']:
+        j_stats = playoff_stats
     else:
-        stats = reg_stats
+        j_stats = reg_stats
 
-    for i, p in enumerate(stats):
-        if p['name'].lower() == player_name:
-            return format_skater_stats(p)
+    match = j_stats[j_stats['name'].str.lower() == player_name]
+    if len(match) > 0:
+        if is_goalie:
+            return format_goalie_stats(match.iloc[0].squeeze())
+        return format_skater_stats(match.iloc[0].squeeze())
 
-    return None
-
-def get_stats_goalie(player_name):
-    player_name = player_name.lower()
-    # SHL playoffs
-    api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats?type="playoffs"'
-    request = urllib.request.Request(api_link, headers=headers)
-    stats = json.loads(urllib.request.urlopen(request).read())
-    playoff_p = None
-    for i, p in enumerate(stats):
-        if p['name'].lower() == player_name and p['gamesPlayed'] > 0:
-            playoff_p = p
-            break
-    # SHL reg season
-    api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats'
-    request = urllib.request.Request(api_link, headers=headers)
-    stats = json.loads(urllib.request.urlopen(request).read())
-    for i, p in enumerate(stats):
-        if p['name'].lower() == player_name:
-            if playoff_p is not None and p['season'] == playoff_p['season']:
-                return format_goalie_stats(playoff_p)
-            return format_goalie_stats(p)
-
-    # SMJHL playoffs
-    api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats?league=1&type="playoffs"'
-    request = urllib.request.Request(api_link, headers=headers)
-    stats = json.loads(urllib.request.urlopen(request).read())
-    for i, p in enumerate(stats):
-        if p['name'].lower() == player_name and p['gamesPlayed'] > 0:
-            playoff_p = p
-            break
-    # SMJHL reg season
-    api_link = 'https://index.simulationhockey.com/api/v1/goalies/stats?league=1'
-    request = urllib.request.Request(api_link, headers=headers)
-    stats = json.loads(urllib.request.urlopen(request).read())
-    for i, p in enumerate(stats):
-        if p['name'].lower() == player_name:
-            if playoff_p is not None and p['season'] == playoff_p['season']:
-                return format_goalie_stats(playoff_p)
-            return format_goalie_stats(p)
-
-    return None
+    return shl_stats, j_stats
 
 def format_skater_stats(raw_json):
     embed = discord.Embed(title=f'{raw_json["team"]} - {raw_json["name"]} - {raw_json["position"]}', description=f'Games Played: {raw_json["gamesPlayed"]}', colour=discord.Colour.red())
@@ -538,7 +545,36 @@ def check_roster(msg):
 
     return None
 
+def close_match(other_str, str_in):
+    # other_str (assume str_in is normalized)
+    other_str_norm = ''.join(other_str.lower().encode('ascii', errors='ignore').decode('ascii').split())
+    # vectorize words
+    vec_str_in = word_vec(str_in)
+    vec_other_str = word_vec(other_str_norm)
+    # iterate over string subsets
+    min_len = min(len(vec_str_in), len(vec_other_str))
+    num_iter = abs(len(vec_str_in) - len(vec_other_str))
+    dists = []
+    # expand into vector of ascii encoding
+    epsilon = 1e-7
+    # just take distance
+    if num_iter == 0:
+        return scipy.spatial.distance.euclidean(vec_str_in.flatten(), vec_other_str.flatten()) + epsilon
+    for i in range(num_iter):
+        if len(str_in) > len(other_str_norm):
+            strs = vec_str_in[i:len(str_in) - num_iter + i].flatten(), vec_other_str.flatten()
+        else:
+            strs = vec_str_in.flatten(), vec_other_str[i:len(other_str_norm) - num_iter + i].flatten()
+        dists.append((scipy.spatial.distance.euclidean(*strs) + epsilon))
 
+    return min(dists)
+
+def word_vec(word):
+    asciied = [ord(c) for c in word]
+    # one hot encode the ascii
+    one_hot = np.zeros((len(asciied), 128))
+    one_hot[:, asciied] = 1
+    return one_hot
 
 def check_message(text):
     if text is not None and len(text) < 2000:
