@@ -6,7 +6,6 @@ from functools import partial
 
 import discord
 import pandas as pd
-import scipy.spatial.distance
 import numpy as np
 pd.options.display.float_format = '{:,.2f}'.format
 
@@ -559,15 +558,18 @@ def close_match(other_str, str_in):
     epsilon = 1e-7
     # just take distance
     if num_iter == 0:
-        return scipy.spatial.distance.euclidean(vec_str_in.flatten(), vec_other_str.flatten()) + epsilon
+        return euclidean_distance(vec_str_in.flatten(), vec_other_str.flatten()) + epsilon
     for i in range(num_iter):
         if len(str_in) > len(other_str_norm):
             strs = vec_str_in[i:len(str_in) - num_iter + i].flatten(), vec_other_str.flatten()
         else:
             strs = vec_str_in.flatten(), vec_other_str[i:len(other_str_norm) - num_iter + i].flatten()
-        dists.append((scipy.spatial.distance.euclidean(*strs) + epsilon))
+        dists.append((euclidean_distance(*strs) + epsilon))
 
     return min(dists)
+
+def euclidean_distance(vec1, vec2):
+    return np.linalg.norm(vec1-vec2)
 
 def word_vec(word):
     asciied = [ord(c) for c in word]
