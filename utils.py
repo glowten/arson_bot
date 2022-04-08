@@ -78,7 +78,7 @@ def process_stats(msg):
 def fuzzy_name_match(player, skater_out, goalie_out):
     # player not found, do fuzzy string matching
     player = ''.join(player.lower().split())
-    match_partial = partial(lev_dist, b=player)
+    match_partial = partial(lev_dist, string_in=player)
     # shl skater
     skater_out[0]['distance'] = skater_out[0]['name'].apply(match_partial)
     shl_skater = skater_out[0].sort_values('distance', ascending=True).iloc[0].squeeze()
@@ -579,35 +579,27 @@ def word_vec(word):
     return one_hot
 
 
-def lev_dist(a, b):
+def lev_dist(other_string, str_in):
     """
-    calc levenshtein distance between strings a and b
-    :param a:
-    :param b:
-    :return:
+    calc levenshtein distance between strings other_string and str_in
     """
-    if len(a) > 30:
-        a = a[:30]
-
-    if len(b) > 30:
-        b = b[:30]
+    if len(str_in) > 30:
+        str_in = str_in[:30]
+    if len(other_string) > 30:
+        other_string = other_string[:30]
 
     @lru_cache(1024)  # for memoization
-    def min_dist(s1, s2):
-
-        if s1 == len(a) or s2 == len(b):
-            return len(a) - s1 + len(b) - s2
-
+    def min_dist(p1, p2):
+        if p1 == len(str_in) or p2 == len(other_string):
+            return len(str_in) - p1 + len(other_string) - p2
         # no change required
-        if a[s1] == b[s2]:
-            return min_dist(s1 + 1, s2 + 1)
-
+        if str_in[p1] == other_string[p2]:
+            return min_dist(p1 + 1, p2 + 1)
         return 1 + min(
-            min_dist(s1, s2 + 1),  # insert character
-            min_dist(s1 + 1, s2),  # delete character
-            min_dist(s1 + 1, s2 + 1),  # replace character
+            min_dist(p1, p2 + 1),  # insert
+            min_dist(p1 + 1, p2),  # delete
+            min_dist(p1 + 1, p2 + 1),  # replace
         )
-
     return min_dist(0, 0)
 
 def check_message(text):
