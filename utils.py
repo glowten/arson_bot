@@ -2,7 +2,7 @@ import os
 import urllib.request
 import urllib.error
 import json
-from functools import partial
+from functools import partial, lru_cache
 
 import discord
 import pandas as pd
@@ -78,7 +78,7 @@ def process_stats(msg):
 def fuzzy_name_match(player, skater_out, goalie_out):
     # player not found, do fuzzy string matching
     player = ''.join(player.lower().split())
-    match_partial = partial(close_match, str_in=player)
+    match_partial = partial(lev_dist, b=player)
     # shl skater
     skater_out[0]['distance'] = skater_out[0]['name'].apply(match_partial)
     shl_skater = skater_out[0].sort_values('distance', ascending=True).iloc[0].squeeze()
@@ -577,6 +577,38 @@ def word_vec(word):
     one_hot = np.zeros((len(asciied), 128))
     one_hot[:, asciied] = 1
     return one_hot
+
+
+def lev_dist(a, b):
+    """
+    calc levenshtein distance between strings a and b
+    :param a:
+    :param b:
+    :return:
+    """
+    if len(a) > 30:
+        a = a[:30]
+
+    if len(b) > 30:
+        b = b[:30]
+
+    @lru_cache(1024)  # for memoization
+    def min_dist(s1, s2):
+
+        if s1 == len(a) or s2 == len(b):
+            return len(a) - s1 + len(b) - s2
+
+        # no change required
+        if a[s1] == b[s2]:
+            return min_dist(s1 + 1, s2 + 1)
+
+        return 1 + min(
+            min_dist(s1, s2 + 1),  # insert character
+            min_dist(s1 + 1, s2),  # delete character
+            min_dist(s1 + 1, s2 + 1),  # replace character
+        )
+
+    return min_dist(0, 0)
 
 def check_message(text):
     if text is not None and len(text) < 2000:
