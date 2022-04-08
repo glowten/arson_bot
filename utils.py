@@ -76,19 +76,20 @@ def process_stats(msg):
     return None
 
 def fuzzy_name_match(player, skater_out, goalie_out):
+    player = player.lower()
     # player not found, do fuzzy string matching
     match_partial = partial(lev_dist, str_in=player)
     # shl skater
-    skater_out[0]['distance'] = skater_out[0]['name'].apply(match_partial)
+    skater_out[0]['distance'] = skater_out[0]['name'].iloc[np.random.permutation(len(skater_out[0]))].apply(match_partial)
     shl_skater = skater_out[0].sort_values('distance', ascending=True).iloc[0].squeeze()
     # j skater
-    skater_out[1]['distance'] = skater_out[1]['name'].apply(match_partial)
+    skater_out[1]['distance'] = skater_out[1]['name'].iloc[np.random.permutation(len(skater_out[1]))].apply(match_partial)
     j_skater = skater_out[1].sort_values('distance', ascending=True).iloc[0].squeeze()
     # shl goalie
-    goalie_out[0]['distance'] = goalie_out[0]['name'].apply(match_partial)
+    goalie_out[0]['distance'] = goalie_out[0]['name'].iloc[np.random.permutation(len(goalie_out[0]))].apply(match_partial)
     shl_goalie = goalie_out[0].sort_values('distance', ascending=True).iloc[0].squeeze()
     # j goalie
-    goalie_out[1]['distance'] = goalie_out[1]['name'].apply(match_partial)
+    goalie_out[1]['distance'] = goalie_out[1]['name'].iloc[np.random.permutation(len(goalie_out[1]))].apply(match_partial)
     j_goalie = goalie_out[1].sort_values('distance', ascending=True).iloc[0].squeeze()
 
     min_match = min(shl_skater['distance'], j_skater['distance'], shl_goalie['distance'], j_goalie['distance'])
@@ -582,6 +583,8 @@ def lev_dist(other_string, str_in):
     """
     calc levenshtein distance between strings other_string and str_in
     """
+    str_in = str_in.lower()
+    other_string = other_string.lower()
     if len(str_in) > 30:
         str_in = str_in[:30]
     if len(other_string) > 30:
