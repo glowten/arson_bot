@@ -136,7 +136,8 @@ def casino(msg):
         casino_lines.loc[casino_lines['wins'] > casino_lines['line'], 'projected'] = 'OVER CONFIRMED'
         casino_lines.loc[casino_lines['wins'] + (total_games - casino_lines['gp']) < casino_lines['line'],
                          'projected'] = 'UNDER CONFIRMED'
-        return '```' + casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']].to_string(index=False) + '```'
+        # return '```' + casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']].to_string(index=False) + '```'
+        return format_df('Casino Projections', '', casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']])
     return None
 
 
@@ -220,6 +221,15 @@ def get_player_stats(player_name, is_goalie=False):
         return format_skater_stats(match.iloc[0].squeeze())
 
     return shl_stats, j_stats
+
+
+def format_df(title, desc, df):
+    embed = discord.Embed(title=title, description=desc, colour=discord.Colour.red())
+    embed.set_footer(text='go fire chickens', icon_url='https://cdn.discordapp.com/emojis/780630737799741461.png?v=1')
+    for col in df.cols:
+        embed.add_field(name=col, value='\n'.join(df[col]))
+    return embed
+
 
 def format_skater_stats(raw_json):
     embed = discord.Embed(title=f'{raw_json["team"]} - {raw_json["name"]} - {raw_json["position"]}', description=f'Games Played: {raw_json["gamesPlayed"]}', colour=discord.Colour.red())
