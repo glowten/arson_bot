@@ -77,7 +77,6 @@ def process_stats(msg):
 
 def fuzzy_name_match(player, skater_out, goalie_out):
     # player not found, do fuzzy string matching
-    player = ''.join(player.lower().split())
     match_partial = partial(lev_dist, str_in=player)
     # shl skater
     skater_out[0]['distance'] = skater_out[0]['name'].apply(match_partial)
