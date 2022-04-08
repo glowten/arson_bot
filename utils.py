@@ -226,7 +226,7 @@ def get_player_stats(player_name, is_goalie=False):
 def format_df(title, desc, df):
     embed = discord.Embed(title=title, description=desc, colour=discord.Colour.red())
     embed.set_footer(text='go fire chickens', icon_url='https://cdn.discordapp.com/emojis/780630737799741461.png?v=1')
-    for col in df.cols:
+    for col in df.columns:
         embed.add_field(name=col, value='\n'.join(df[col]))
     return embed
 
