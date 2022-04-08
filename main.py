@@ -54,7 +54,7 @@ async def on_message(message):
 
         casino_msg = casino(message)
         if not casino_msg is None:
-            await message.channel.send(embed=casino_msg)
+            await message.channel.send(str(casino_msg))
 
         ge_msg = geify(message)
         ge_msg = check_message(ge_msg)

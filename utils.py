@@ -136,8 +136,8 @@ def casino(msg):
         casino_lines.loc[casino_lines['wins'] > casino_lines['line'], 'projected'] = 'OVER CONFIRMED'
         casino_lines.loc[casino_lines['wins'] + (total_games - casino_lines['gp']) < casino_lines['line'],
                          'projected'] = 'UNDER CONFIRMED'
-        # return '```' + casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']].to_string(index=False) + '```'
-        return format_df('Casino Projections', '', casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']])
+        return '```' + casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']].to_string(index=False) + '```'
+        # return format_df('Casino Projections', '', casino_lines[['team', 'gp', 'wins', 'line', 'trend', 'projected']])
     return None
 
 
